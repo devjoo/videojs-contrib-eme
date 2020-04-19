@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <link href="https://unpkg.com/video.js/dist/video-js.css" rel="stylesheet">
+</head>
+
+<body>
+    <video id="my-video" class="video-js" controls preload="auto" width="640" height="264" autoplay poster="MY_VIDEO_POSTER.jpg"
+        data-setup="{}"></video>
+    <br>
+
+    <p>Stream URL <input type="text" id="stream" value="https://rt-usa.secure.footprint.net/1105.m3u8"> autoplay <input type="checkbox" id="autoplay"></p>
+    <p>
+        <select name="drm" id="drm">
+            <option value="1">FAIRPLAY</option>
+            <option value="2">WIDEVINE</option>
+        </select>
+    </p>
+    <p id="pCertificate">Certificate URL <input type="text" id="certificate"></p>
+    <p>License URL <input type="text" id="license"></p>
+    <p><button id="btn">load</button></p>
+
+    <!-- <script src="https://cdn.jsdelivr.net/npm/video.js@7.4.1/dist/video.js"></script> -->
+    <!-- <script src="https://cdn.jsdelivr.net/npm/videojs-contrib-eme@3.4.1/dist/videojs-contrib-eme.js"></script> -->
+
+    <script src="https://unpkg.com/video.js/dist/video.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/videojs-contrib-eme@3.4.1/dist/videojs-contrib-eme.js"></script>
+
+    <script>
+        var player = videojs('my-video');
+        var drmVendor = document.querySelector("#drm");
+        var pCertificate = document.querySelector("#pCertificate");
+        var autoplay = document.querySelector("#autoplay");
+
+        var KEY = {
+            "merchant": 'kinow',
+            "userId": 'purchase',
+            "sessionId": 'a1d1f0p1'
+        }
+
+        // Convert Uint8Array into base64 using base64url alphabet, without padding.
+        var toBase64 = (u8arr) => {
+            return btoa(String.fromCharCode.apply(null, u8arr)).
+                replace(/\+/g, '-').replace(/\//g, '_').replace(/=*$/, '');
+        }
+
+        player.eme();
+
+        drmVendor.addEventListener('change', function(e){
+            if(2 == drmVendor.options[drmVendor.selectedIndex].value){
+                pCertificate.style.display = "none"; 
+                return;
+            }
+
+            pCertificate.style.display = "block"; 
+        });
+
+        document.querySelector('#btn').addEventListener('click', function () {
+            var drmVendorValue = drmVendor.options[drmVendor.selectedIndex].value;
+            var keySystems = {};
+            var type;
+            var src = document.querySelector("#stream").value;
+            var srcObj;
+
+            if (drmVendorValue === "1") {
+                type = "application/x-mpegURL";
+                keySystems = {
+                    "com.apple.fps.1_0": {
+                        certificateUri: document.querySelector("#certificate").value,
+                        certificateHeaders: {
+                            'x-dt-custom-data': 'INSERT-YOUR-BASE64-ENCODED-CUSTOMDATA'
+                        },
+                        licenseUri: document.querySelector("#license").value,
+                        licenseHeaders: {
+                            authorization: toBase64(KEY)
+                        }
+                    }
+                };
+            } else {
+                type = "application/dash+xml";
+                keySystems = {
+                    "com.widevine.alpha": document.querySelector("#license").value
+                };
+            }
+
+
+            srcObj = {
+                src: src,
+                type: type,
+                autoplay: autoplay.checked,
+                keySystems: keySystems
+            };
+
+            console.log("src object", srcObj);
+
+            player.src(srcObj);
+            // player.play();
+        });
+    </script>
+</body>
+
+</html>

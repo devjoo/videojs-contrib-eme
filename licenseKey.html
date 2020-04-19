@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <link href="https://unpkg.com/video.js/dist/video-js.css" rel="stylesheet">
+</head>
+
+<body>
+    <video id="my-video" class="video-js" src="https://rt-usa.secure.footprint.net/1105.m3u8" controls autoplay  width="640" height="264"
+        onneedkey="handleKeyNeeded(event)" data-setup="{}"></video>
+    <br>
+
+    <p>Stream URL <input type="text" id="stream" value="https://eventgridmediaservice-usw22.streaming.media.azure.net/2fa069bd-2b0c-4674-bff7-26ebd6cdc224/MicrosoftElite01.ism/manifest(format=m3u8-aapl,encryption=cbcs-aapl)"> autoplay <input type="checkbox" id="autoplay"></p>
+    <p>
+        <select name="drm" id="drm">
+            <option value="1">FAIRPLAY</option>
+            <option value="2">WIDEVINE</option>
+        </select>
+    </p>
+    <p id="pCertificate">Certificate URL <input type="text" id="certificate" value="https://openidconnectweb.azurewebsites.net/Content/FPSAC.cer"></p>
+    <p>License URL <input type="text" id="license" value="https://eventgridmediaservice.keydelivery.westus2-2.media.azure.net/FairPlay/?kid=70d14e71-4380-470c-acff-61dea6382ccf"></p>
+    <p><button id="btn">load</button></p>
+
+    <script src="https://unpkg.com/video.js/dist/video.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/videojs-contrib-eme@3.4.1/dist/videojs-contrib-eme.js"></script>
+
+    <script>
+        var player = videojs('my-video');
+        
+        var keySystem;
+        var licenseUrl;
+
+        // Convert Uint8Array into base64 using base64url alphabet, without padding.
+        var toBase64 = (u8arr) => {
+            return btoa(String.fromCharCode.apply(null, u8arr)).
+                replace(/\+/g, '-').replace(/\//g, '_').replace(/=*$/, '');
+        }
+
+        var KEY = {
+            "merchant": 'kinow',
+            "userId": 'purchase',
+            "sessionId": 'a1d1f0p1'
+        }
+    
+    function selectKeySystem() {
+      if (MediaKeys.isTypeSupported("com.example.somesystem",
+          "video/webm; codecs='vp8, vorbis'")) {
+        licenseUrl = "https://license.example.com/getkey";
+        keySystem = "com.example.somesystem";
+      } else if (MediaKeys.isTypeSupported("com.foobar",
+          "video/webm; codecs='vp8, vorbis'")) {
+        licenseUrl = "https://license.foobar.com/request";
+        keySystem = "com.foobar";
+      } else {
+        throw "Key System not supported";
+      }
+    }
+    
+    function handleKeyNeeded(event) {
+        debugger;
+      var video = event.target;
+      if (!video.mediaKeys) {
+        selectKeySystem();
+        video.setMediaKeys(new MediaKeys(keySystem));
+      }
+      if (!video.keys) {
+        throw "Could not create MediaKeys";
+      }
+      var keySession = video.keys.createSession(event.contentType, event.initData);
+      if (!keySession) {
+        throw "Could not create key session";
+      }
+      keySession.addEventListener("message", licenseRequestReady, false);
+    }
+    
+    function licenseRequestReady(event) {
+      var keySession = event.target;
+      var request = event.message;
+      if (!request) {
+        throw "Could not create license request";
+      }
+      var xmlhttp = new XMLHttpRequest();
+      xmlhttp.open("POST", licenseUrl);
+      xmlhttp.onreadystatechange = function () {
+        if (xmlhttp.readyState === 4) {
+          var license = new Uint8Array(xmlhttp.response);
+          keySession.update(license); // 이제 재생이 가능함
+        }
+      }
+      xmlhttp.send(request);
+    }
+
+    document.querySelector('#btn').addEventListener('click', function () {
+        var keySystems = {};
+        var type;
+        var src = document.querySelector("#stream").value;
+        var srcObj;
+
+        type = "application/x-mpegURL";
+        keySystems = {
+            "com.apple.fps.1_0": {
+                certificateUri: document.querySelector("#certificate").value,
+                // certificateHeaders: {
+                //     'x-dt-custom-data': 'INSERT-YOUR-BASE64-ENCODED-CUSTOMDATA'
+                // },
+                licenseUri: document.querySelector("#license").value,
+                // licenseHeaders: {
+                //     authorization: toBase64(KEY)
+                // }
+            }
+        };
+        
+        srcObj = {
+            src: src,
+            type: type,
+            autoplay: autoplay.checked,
+            keySystems: keySystems
+        };
+
+        console.log("src object", srcObj);
+
+        player.src(srcObj);
+        // player.play();
+    });
+    </script>
+</body>
+
+</html>
